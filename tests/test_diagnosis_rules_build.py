@@ -56,7 +56,7 @@ class DiagnosisRulesBuildTests(unittest.TestCase):
         out_ids = set(
             re.findall(r"^- \*\*([A-J]-\d+)\*\*", self.rendered, re.M)
         )
-        self.assertEqual(len(taxo_ids), 71)
+        self.assertEqual(len(taxo_ids), 73)
         self.assertEqual(taxo_ids, out_ids)
 
     def test_document_level_patterns_included(self) -> None:
@@ -67,7 +67,7 @@ class DiagnosisRulesBuildTests(unittest.TestCase):
     def test_no_empty_definitions_or_signatures(self) -> None:
         """패턴당 시그니처 줄이 정확히 71개, 빈 값 0."""
         sig_lines = re.findall(r"^  시그니처:\s*(.*)$", self.rendered, re.M)
-        self.assertEqual(len(sig_lines), 71)
+        self.assertEqual(len(sig_lines), 73)
         self.assertEqual([s for s in sig_lines if not s.strip()], [])
 
     def test_size_within_budget(self) -> None:
