@@ -20,8 +20,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.join(HERE, "..", "scripts")
 
 # 부피 게이트: taxonomy(74.8KB) 대비 대폭 절감이 이 파일의 존재 이유.
-# 한글 UTF-8 3바이트 특성상 71패턴 × 2줄의 물리 하한이 있어 상한 14KB.
-MAX_BYTES = 14 * 1024
+# 한글 UTF-8 3바이트 특성상 패턴 × 2줄의 물리 하한이 있다. K 분류(5패턴) 추가로 14KB → 16KB.
+MAX_BYTES = 16 * 1024
 MIN_BYTES = 5 * 1024  # 지나치게 작으면 내용 소실 의심
 
 
@@ -50,13 +50,13 @@ class DiagnosisRulesBuildTests(unittest.TestCase):
             "`python3 scripts/build_diagnosis_rules.py` 로 재생성하라.",
         )
 
-    def test_all_71_ids_covered(self) -> None:
+    def test_all_ids_covered(self) -> None:
         """taxonomy의 패턴 ID 전수(quick:false 문서레벨 포함)가 인덱스에 있다."""
         taxo_ids = {p["id"] for p in self.patterns}
         out_ids = set(
-            re.findall(r"^- \*\*([A-J]-\d+)\*\*", self.rendered, re.M)
+            re.findall(r"^- \*\*([A-K]-\d+)\*\*", self.rendered, re.M)
         )
-        self.assertEqual(len(taxo_ids), 73)
+        self.assertEqual(len(taxo_ids), 78)
         self.assertEqual(taxo_ids, out_ids)
 
     def test_document_level_patterns_included(self) -> None:
@@ -67,7 +67,7 @@ class DiagnosisRulesBuildTests(unittest.TestCase):
     def test_no_empty_definitions_or_signatures(self) -> None:
         """패턴당 시그니처 줄이 정확히 71개, 빈 값 0."""
         sig_lines = re.findall(r"^  시그니처:\s*(.*)$", self.rendered, re.M)
-        self.assertEqual(len(sig_lines), 73)
+        self.assertEqual(len(sig_lines), 78)
         self.assertEqual([s for s in sig_lines if not s.strip()], [])
 
     def test_size_within_budget(self) -> None:

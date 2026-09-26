@@ -1,4 +1,4 @@
-# Humanize KR — AI 한글 티 제거 하네스 (v2.3.2)
+# Humanize KR — AI 한글 티 제거 하네스 (v2.4.0)
 
 ## 프로젝트 개요
 
@@ -15,9 +15,9 @@ v2.2부터 shim이 정량 점수로 산출하는 **`route_hint`(light | standard
 ## 철칙
 
 1. **의미 불변 (Fidelity First)** — 사실·주장·수치·고유명사·인용은 100% 원문 보존.
-2. **근거 기반 (Span-Grounded)** — 모든 변경은 탐지 finding에 연결. 탐지 없는 구간은 건드리지 않음.
+2. **근거 기반 (Span-Grounded)** — 모든 변경은 탐지 finding에 연결. 탐지 없는 구간은 건드리지 않음. 문장 단위를 넘는 편집(순서 변경·문단 병합·분할·재진술 삭제)은 담화 모드에서 K 분류 처방으로만 하고, 지우는 문장의 수치·고유명사·내용 앵커가 글의 다른 곳에 남아 있을 때만 지운다.
 3. **장르 유지 (Tone Match)** — 칼럼을 문학으로, 리포트를 에세이로 옮기지 않음.
-4. **과윤문 금지 (No Over-Polish)** — 변경률 30% 초과 시 경고, 50% 초과 시 강제 중단.
+4. **과윤문 금지 (No Over-Polish)** — 변경률 30% 초과 시 경고, 50% 초과 시 강제 중단. 담화 모드(standard·heavy 기본)는 45% / 70%이며, 수치 소실이 경고로 오르고 담화 편집이 있으면 finalize 가 의미 보존을 검증한다.
 5. **register 보존 — 양방향** — 격식체 입력은 격식체 출력, 구어 입력은 구어 출력. 원문보다 딱딱하게 만들지 않는다: **'-했-' → '-하였-' 치환 금지**, '~인데요/~거든요/~한 겁니다' 구어 종결 보존. (하향 금지만 있던 기존 단방향 규칙으로는 합쇼체가 유지되는 '했→하였' 상향을 못 잡았다.) AI 티는 문법·수사이지 격식 자체가 아니다.
 6. **AI 티는 빼기만 하고 넣지 않는다 (No New Tells)** — 원문에 없던 상투구("기록적인 성과를 거두었다"·"괄목할 만한"·"~로 평가된다") 신규 삽입 금지. 살아있는 구어는 사람 글의 증거이므로 보존한다. 철칙 #2가 "탐지 없는 구간은 손대지 않는다"라면, #6은 "손대는 구간에도 새 AI 티를 심지 않는다" — 모순이 아니라 보완이다.
 
@@ -66,7 +66,7 @@ im-not-ai/
 ├── agents/                        # 서브에이전트 9종 (플러그인 컨벤션 — 루트 agents/에 둬야 로드됨)
 │   ├── humanize-monolith.md       # 전 경로 공용 윤문 콜
 │   ├── humanize-diagnostician.md  # standard·heavy P1 진단 (지배 패턴 3~6개)
-│   ├── humanize-finalizer.md      # heavy P3 마무리 (의미 15항 + 자연성)
+│   ├── humanize-finalizer.md      # heavy P3 마무리 (의미 16항 + 자연성)
 │   ├── korean-ai-tell-taxonomist.md  # 유지보수 (SSOT 갱신)
 │   └── … 개발용 지원 5종 (scholar·distiller·gap-analyzer·metric-engineer·integrator)
 ├── skills/                # 스킬 3종 (humanize-korean 오케스트레이터 + humanize·humanize-redo 진입)
@@ -109,7 +109,7 @@ im-not-ai/
                      ↓ [shim --diagnosis] (청킹 필요 시에만 --chunk)
                    [humanize-monolith — shim이 청크 2+개 만든 경우에만 청크 병렬]
                      ↓ [verify_change_rate.py] (P2.5)
-                   [humanize-finalizer — 의미 15항 + 자연성, 국소 보정]
+                   [humanize-finalizer — 의미 16항 + 자연성, 국소 보정]
                    final.md(보정) + 09_finalize.json
     ↓ [scripts/verify_change_rate.py — 변경률 게이트 (exit code)] — 모든 경로 공통
 ```
@@ -125,7 +125,7 @@ im-not-ai/
 
 1. **humanize-monolith** — 전 경로 공용 윤문 콜. 한 콜에서 탐지·윤문·자체검증. 도구 호출 3회 캡 (v1.6.1).
 2. **humanize-diagnostician** — standard·heavy P1 진단. 글 전체의 지배 패턴 3~6개를 본진 ID로 진단 → `02_diagnosis.md`.
-3. **humanize-finalizer** — heavy P3 마무리. 원문 직접 대조로 의미 15항 + 자연성(잔존·과윤문 양방향) 판정, 문제 구간만 국소 보정 → `09_finalize.json`. 도구 호출 4회 캡.
+3. **humanize-finalizer** — heavy P3 마무리. 원문 직접 대조로 의미 16항 + 자연성(잔존·과윤문 양방향) 판정, 문제 구간만 국소 보정 → `09_finalize.json`. 도구 호출 4회 캡.
 
 **유지보수 1종** (별도 명령으로만):
 

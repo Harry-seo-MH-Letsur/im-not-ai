@@ -642,6 +642,12 @@ def antithesis_count(text: str) -> int:
 CHANGE_RATE_WARN = 0.30   # 30% 초과 — 경고, 과윤문 점검
 CHANGE_RATE_ABORT = 0.50  # 50% 초과 — 강제 중단
 
+# 담화 편집(K 분류) 모드 임계값. 문장 순서 변경·문단 병합·재진술 삭제는
+# 문자 diff를 크게 부풀리므로 표층 윤문과 같은 선을 쓰면 정상 편집이 막힌다.
+# 대신 이 모드에서는 verify_gates.py가 수치 소실을 경고로 올려 의미 손실을 잡는다.
+DISCOURSE_CHANGE_RATE_WARN = 0.45
+DISCOURSE_CHANGE_RATE_ABORT = 0.70
+
 # 마크업 전용 줄: 코드 펜스·수평선·표 구분선 등 — ignore_markup 모드에서 제거.
 _MARKUP_ONLY_LINE_RE = re.compile(
     r"^\s*(?:```.*|~~~.*|-{3,}|\*{3,}|={3,}|\|[\s:\-|]*)\s*$"

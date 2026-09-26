@@ -131,6 +131,12 @@ _PLAIN = (
     "버스가 늦게 온다. 정류장에는 사람이 많다."
 )
 
+# _PLAIN의 문장 순서만 바꾼 것 — 담화 편집(K 분류)의 최소 사례. 문자율 37.5%.
+_PLAIN_REORDERED = (
+    "우산을 챙겨야 한다. 오늘은 비가 온다. 길이 미끄럽다. "
+    "정류장에는 사람이 많다. 버스가 늦게 온다."
+)
+
 # C-8 대구 6회 — 전멸 판정용.
 _ANTITHESIS_HEAVY = (
     "문제는 속도가 아니라 방향이다. 핵심은 기술이 아니라 태도다. "
@@ -175,6 +181,21 @@ class MainExitCodeTests(unittest.TestCase):
         before = _PLAIN + " 물가는 2.4% 올랐다."
         after = _PLAIN  # 수치 문장 병합으로 소실됐다고 가정
         self.assertEqual(self._run(before, after), 0)
+
+    def test_discourse_reorder_warns_by_default(self) -> None:
+        """문장 순서만 바꿔도 문자율 37.5% — 표층 모드 기준으로는 경고."""
+        self.assertEqual(self._run(_PLAIN, _PLAIN_REORDERED), 1)
+
+    def test_discourse_mode_accepts_reorder(self) -> None:
+        """담화 모드(K 분류)는 45% 미만 순서 변경을 정상 편집으로 본다."""
+        self.assertEqual(
+            self._run(_PLAIN, _PLAIN_REORDERED, ["--discourse"]), 0
+        )
+
+    def test_discourse_mode_number_drop_is_warn(self) -> None:
+        """담화 모드에서 수치가 글 전체에서 사라지면 K 삭제 조건 위반 — 경고."""
+        before = _PLAIN + " 물가는 2.4% 올랐다."
+        self.assertEqual(self._run(before, _PLAIN, ["--discourse"]), 1)
 
     def test_korean_unit_swap_not_injected(self) -> None:
         """"1만" → "10,000" 표기 교체는 주입/소실 어느 쪽도 아님 — exit 0."""

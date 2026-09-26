@@ -34,6 +34,8 @@ CLI:
         --after  _workspace/{run_id}/final.md \
         --genre essay
     옵션: --json (구조화 출력 병기) / --ignore-markup (문자율 축만 적용)
+          --discourse (담화 편집 모드 — 문자율 WARN 45% / ABORT 70%,
+                       P4 수치 소실을 리포트에서 WARN으로 승격)
 """
 
 from __future__ import annotations
@@ -188,7 +190,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="문자율 축에서 마크업 줄·줄머리 장식을 제외하고 본문만 비교",
     )
+    p.add_argument(
+        "--discourse",
+        action="store_true",
+        help="담화 편집(K 분류) 모드 — 문자율 임계 45%%/70%%, 수치 소실을 WARN으로",
+    )
     args = p.parse_args(argv)
+    rate_warn = _m.DISCOURSE_CHANGE_RATE_WARN if args.discourse else _m.CHANGE_RATE_WARN
+    rate_abort = _m.DISCOURSE_CHANGE_RATE_ABORT if args.discourse else _m.CHANGE_RATE_ABORT
 
     for path in (args.before, args.after):
         if not os.path.exists(path):
@@ -202,18 +211,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: 파일 읽기 실패: {e}", file=sys.stderr)
         return 3
 
-    report: dict = {"genre": args.genre}
+    report: dict = {"genre": args.genre, "discourse": args.discourse}
     warn = False
 
     # --- P0 문자율 (기존 verify_change_rate.py와 동일 판정) ---------------
     rate = _m.change_rate(before, after, ignore_markup=args.ignore_markup)
-    abort = rate >= _m.CHANGE_RATE_ABORT
-    if _m.CHANGE_RATE_WARN <= rate < _m.CHANGE_RATE_ABORT:
+    abort = rate >= rate_abort
+    if rate_warn <= rate < rate_abort:
         warn = True
     scope = "본문만 (마크업 제외)" if args.ignore_markup else "전문"
+    if args.discourse:
+        scope += " · 담화 모드"
     if abort:
         p0_verdict = "ABORT — 강제 중단. 윤문본 채택 금지"
-    elif rate >= _m.CHANGE_RATE_WARN:
+    elif rate >= rate_warn:
         p0_verdict = "WARN — 과윤문 경고"
     else:
         p0_verdict = "OK"
@@ -221,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         "rate": round(rate, 4), "scope": scope, "verdict": p0_verdict,
     }
     print(f"[P0 문자율] {rate * 100:.1f}% [{scope}] — {p0_verdict} "
-          f"(경고 {_m.CHANGE_RATE_WARN * 100:.0f}% / 중단 {_m.CHANGE_RATE_ABORT * 100:.0f}%)")
+          f"(경고 {rate_warn * 100:.0f}% / 중단 {rate_abort * 100:.0f}%)")
 
     # --- P1 목표 달성 (before z > +2.0인 어휘 S1 지표) --------------------
     try:
@@ -274,7 +285,13 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[P4 터치율] {touch_rate * 100:.1f}% ({touched}/{total} 문장) — 보고 전용")
     dropped = _checks.dropped_numbers(before, after)
     report["numbers_dropped"] = dropped
-    if dropped:
+    if dropped and args.discourse:
+        # 담화 모드는 문장 삭제를 허용하므로, 수치가 글 전체에서 사라졌다면
+        # K 삭제 조건(앵커가 다른 곳에 남아 있을 때만 삭제) 위반 신호다.
+        warn = True
+        print(f"[P4 수치소실] WARN: {dropped} "
+              f"(담화 모드 — 삭제·병합으로 수치가 사라졌을 수 있음, finalize 승급)")
+    elif dropped:
         print(f"[P4 수치소실] 관찰: {dropped} "
               f"(문장 병합·표기 통합이면 정상 — exit 미반영, 확인 요망)")
 
