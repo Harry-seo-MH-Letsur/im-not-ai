@@ -97,8 +97,32 @@ class RouteHintTests(unittest.TestCase):
         out = PREP.compute_route_hint(_metrics_stub(risk_band="low"))
         self.assertEqual(out["route_hint"], "light")
 
-    def test_light_boundary_two_tells_medium(self) -> None:
-        obj = _metrics_stub(risk_band="medium", pivots=1, double_passive=1)
+    def test_one_tell_low_is_standard(self) -> None:
+        """light 문턱 강화: 카운트형 티가 하나라도 있으면 light 가 아니다."""
+        obj = _metrics_stub(risk_band="low", pivots=1)
+        self.assertEqual(PREP.compute_route_hint(obj)["route_hint"], "standard")
+
+    def test_zero_tells_medium_is_standard(self) -> None:
+        obj = _metrics_stub(risk_band="medium")
+        self.assertEqual(PREP.compute_route_hint(obj)["route_hint"], "standard")
+
+    def test_ending_comma_structural_tell_blocks_light(self) -> None:
+        """실사용 사례: 카운트형 0이어도 C-11 쉼표 z=+4.8 이면 standard."""
+        obj = _metrics_stub(risk_band="low")
+        obj["z_scores"] = {"ending_comma_rate": 4.78}
+        out = PREP.compute_route_hint(obj)
+        self.assertEqual(out["route_hint"], "standard")
+        self.assertEqual(len(out["route_signals"]["structural_tells"]), 1)
+
+    def test_antithesis_structural_tell_blocks_light(self) -> None:
+        obj = _metrics_stub(risk_band="low")
+        obj["v2_metrics"]["antithesis_count"] = 2
+        self.assertEqual(PREP.compute_route_hint(obj)["route_hint"], "standard")
+
+    def test_below_structural_thresholds_stays_light(self) -> None:
+        obj = _metrics_stub(risk_band="low")
+        obj["z_scores"] = {"ending_comma_rate": 1.4}
+        obj["v2_metrics"]["antithesis_count"] = 1
         self.assertEqual(PREP.compute_route_hint(obj)["route_hint"], "light")
 
     def test_three_tells_medium_is_standard(self) -> None:

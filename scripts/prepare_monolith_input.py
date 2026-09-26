@@ -165,7 +165,7 @@ def _load_input(input_path: Path, run_dir: Path, enabled: bool) -> str:
 # 사용자·오케스트레이터가 무시할 수 있고, 산출 실패 시 없는 채로 진행한다.
 #
 # 3-tier 판정 (전부 결정적 · 실측 기반):
-#   light    — 카운트형 어휘·피동 티 합 ≤ 2 AND risk_band low~medium.
+#   light    — 카운트형 어휘·피동 티 0 AND risk_band low AND 구조 티 0.
 #              이미 잘 쓴 글. 단일 콜·최소 파이프라인 권장.
 #   standard — 그 외 (티가 섞여 있거나, 카운트형 0이어도 구조 지표로 risk high).
 #              진단 + 단일 윤문 권장. 실측 글(카운트 0·risk high)이 여기 온다.
@@ -174,9 +174,20 @@ def _load_input(input_path: Path, run_dir: Path, enabled: bool) -> str:
 #
 # 카운트형 티 = v1.6 conclusion_pivot·safe_balance + v2.0 이중피동·에의해피동·
 # have/make직역·이중조사. 전부 정수 카운트라 baseline calibration 없이도 안정적.
-# 밀도·z-score 지표는 판정에서 제외 — v2 baseline 이 placeholder 라 불안정하다.
+# v2 z-score 지표는 판정에서 제외 — v2 baseline 이 placeholder 라 불안정하다.
+#
+# light 문턱 강화 (2026-09-27): 최신 모델 초안은 카운트형 어휘 티가 거의 0이라
+# 옛 문턱(≤2 · medium 허용)에서는 실사용 9건 중 8건이 light 로 빠져 변경률
+# 0~0.7%로 끝났다. 그중엔 연결어미 뒤 쉼표 z=+4.8·대구 2회처럼 구조 티가
+# 뚜렷한 글도 있었다. light 는 "손댈 게 정말 없다"의 판정이므로 구조 티가
+# 하나라도 보이면 standard 로 올린다 — 비용은 진단 1콜뿐이다.
+# 구조 티 = v1.6 ending_comma z ≥ 1.5(C-11, 렌더의 ★ S1 트리거와 같은 선)
+#          + 대구 antithesis_count ≥ 2(C-8 quick-rule 의 2회+ 문턱).
 
-ROUTE_LIGHT_MAX_TELLS = 2
+ROUTE_LIGHT_MAX_TELLS = 0
+ROUTE_LIGHT_RISK_BANDS = ("low",)
+ROUTE_STRUCT_ENDING_COMMA_Z = 1.5
+ROUTE_STRUCT_ANTITHESIS_MIN = 2
 ROUTE_HEAVY_MIN_TELLS = 8
 # 초장문 기준. 아래 청킹 섹션의 CHUNK_RECOMMEND_MIN_CHARS 가 이 값을 공유한다
 # — "heavy 판정"과 "청킹이 의미 있는 최소 분량"은 같은 실증에서 나온 한 기준.
@@ -207,6 +218,15 @@ def compute_route_hint(metrics_obj: dict) -> dict:
     chars = int(metrics_obj.get("char_count") or 0)
     risk = metrics_obj.get("risk_band", "unknown")
 
+    z = metrics_obj.get("z_scores") or {}
+    struct_tells = []
+    ending_comma_z = z.get("ending_comma_rate")
+    if ending_comma_z is not None and ending_comma_z >= ROUTE_STRUCT_ENDING_COMMA_Z:
+        struct_tells.append(f"C-11 쉼표 z={ending_comma_z:+.1f}")
+    antithesis = int(v2.get("antithesis_count") or 0)
+    if antithesis >= ROUTE_STRUCT_ANTITHESIS_MIN:
+        struct_tells.append(f"C-8 대구 {antithesis}회")
+
     if chars > ROUTE_HEAVY_MIN_CHARS:
         hint = "heavy"
         reason = (
@@ -218,22 +238,29 @@ def compute_route_hint(metrics_obj: dict) -> dict:
             f"risk_band high + 카운트형 티 {tells}건 — AI 슬롭 밀집, "
             f"진단 + 청킹 권장"
         )
-    elif tells <= ROUTE_LIGHT_MAX_TELLS and risk in ("low", "medium"):
+    elif (
+        tells <= ROUTE_LIGHT_MAX_TELLS
+        and risk in ROUTE_LIGHT_RISK_BANDS
+        and not struct_tells
+    ):
         hint = "light"
         reason = (
-            f"카운트형 어휘·피동 티 {tells}건 · risk_band {risk} — "
+            f"카운트형 어휘·피동 티 {tells}건 · risk_band {risk} · 구조 티 0 — "
             f"이미 잘 쓴 글, 단일 콜·최소 파이프라인 권장"
         )
     else:
         hint = "standard"
+        struct_note = f" · 구조 티 {', '.join(struct_tells)}" if struct_tells else ""
         reason = (
-            f"카운트형 티 {tells}건 · risk_band {risk} — 진단 + 단일 윤문 권장"
+            f"카운트형 티 {tells}건 · risk_band {risk}{struct_note} — "
+            f"진단 + 단일 윤문 권장"
         )
     return {
         "route_hint": hint,
         "route_reason": reason,
         "route_signals": {
             "lexical_tell_count": tells,
+            "structural_tells": struct_tells,
             "risk_band": risk,
             "char_count": chars,
         },
